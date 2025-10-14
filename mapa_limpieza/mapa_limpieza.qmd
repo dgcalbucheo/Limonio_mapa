@@ -1,0 +1,27 @@
+---
+title: "mapa_limpieza"
+format: html
+---
+
+# Packages
+```{r}
+#| include: false
+required_packages <- c(
+  "tidyverse", "here", "tmap", "sf"
+)
+
+lapply(required_packages, function(pkg) {
+  if (!require(pkg, character.only = TRUE)) install.packages(pkg)
+  library(pkg, character.only = TRUE)
+})
+```
+
+# Datos
+```{r}
+inat <- read_csv(here("observations-627976.csv"))
+head(inat)
+```
+
+
+
+
