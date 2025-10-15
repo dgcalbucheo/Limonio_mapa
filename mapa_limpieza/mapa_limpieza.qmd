@@ -5,23 +5,117 @@ format: html
 
 # Packages
 ```{r}
+install.packages("remotes")
+remotes::install_github("ropensci/rnaturalearthhires")
+
+```
+
+```{r}
+#| message: false
+#| warning: false
 #| include: false
 required_packages <- c(
-  "tidyverse", "here", "tmap", "sf"
+  "tidyverse", "here", "tmap", "sf", "maps",
+  "rnaturalearth", "rnaturalearthdata" #Para regiones administrativas
 )
 
 lapply(required_packages, function(pkg) {
   if (!require(pkg, character.only = TRUE)) install.packages(pkg)
   library(pkg, character.only = TRUE)
 })
+
+
+#### iNaturalist
+inat <- read.csv(here("inat.csv"), sep =";")
+# head(inat)
+
+#Filtrar por criterio
+inat_f <- inat %>%
+  filter(CRITERIO.L.G.MIN == "Si")
+
+head(inat_f)
+
+#### Otros puntos
+# puntos <- read.csv(here("puntos.csv"), sep = ";")
+# puntos_f <- puntos %>%
+  # mutate(latitude = as.numeric(latitude),
+         # longitude = as.numeric(longitude)) %>%
+  # filter(!is.na(latitude), !is.na(longitude)) %>%
+  # mutate(source = "Puntos extra")
+
+# Combinar para límites y estética
+# all_pts <- bind_rows(inat_f, puntos_f)
+
 ```
 
-# Datos
+
+
+#Mapa
+##Capas base
 ```{r}
-inat <- read_csv(here("observations-627976.csv"))
-head(inat)
+# Países para fondo 
+world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
+
+# Regiones administrativas de Chile (Admin-1)
+cl_regions <- rnaturalearth::ne_states(country = "Chile", returnclass = "sf")
+
+# Expansión ligera del encuadre
+x_pad <- diff(range(all_pts$longitude))*0.05
+y_pad <- diff(range(all_pts$latitude))*0.05
+xlim_use <- range(all_pts$longitude) + c(-x_pad, x_pad)
+ylim_use <- range(all_pts$latitude) + c(-y_pad, y_pad)
+```
+
+
+#Mapa 1 (iNat)
+```{r}
+mapa1<-ggplot() +
+  geom_sf(data = world, fill = "grey95", color = "grey80", linewidth = 0.2) +
+  geom_sf(data = cl_regions, fill = NA, color = "grey35", linewidth = 0.3) +
+  geom_point(
+    data = inat_f,
+    aes(x = longitude, y = latitude),
+    size = 1.9, alpha = 0.75, color = "#2B83BA"
+  ) +
+  coord_sf(xlim = c(-72.5, -69.5), ylim = c(-34, -30), expand = FALSE) +
+  labs(
+    title = "Exploratorio iNaturalist con límites regionales",
+    x = "Longitud", y = "Latitud"
+  ) +
+  theme_minimal()
+
+
+mapa1
+
+ggsave(
+  filename = here("mapa_inat.png"),
+  plot = mapa1,
+  width = 8, height = 6, dpi = 300
+)
 ```
 
 
 
+#Mapa 2 (iNat+puntos)
+```{r}
+# --- Plot ---
+ggplot() +
+  geom_sf(data = world, fill = "grey95", color = "grey80", linewidth = 0.2) +
+  geom_sf(data = cl_regions, fill = NA, color = "grey35", linewidth = 0.3) +
+  geom_point(
+    data = all_pts,
+    aes(x = longitude, y = latitude, color = source),
+    size = 1.9, alpha = 0.75
+  ) +
+  coord_sf(xlim = xlim_use, ylim = ylim_use, expand = FALSE) +
+  scale_color_manual(values = c("iNaturalist" = "#2B83BA", "Puntos extra" = "#D7191C")) +
+  labs(
+    title = "Registros georreferenciados",
+    subtitle = "CRITERIO.L.G.MIN = 'Si' (iNat) + puntos.csv",
+    x = "Longitud", y = "Latitud", color = "Fuente",
+    caption = "Base admin: rnaturalearth • Datos: inat.csv y puntos.csv"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
 
